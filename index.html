@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Islands of Focus</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#020611">
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="splash">
+    <div class="splash-inner">
+      <h1>Islands of Focus</h1>
+      <p>Drop into your own music world. Sail between glowing islands, or let it shuffle while you drift.</p>
+      <button id="enterBtn">Enter World</button>
+    </div>
+  </div>
+
+  <div id="ui">
+    <div class="ui-row">
+      <button id="folderBtn">Choose Music</button>
+      <button id="focusBtn">Focus Mode</button>
+      <button id="audioBtn">Start Audio</button>
+      <button id="relaxBtn">Relax Mode</button>
+    </div>
+    <div class="ui-row">
+      <div id="track">No track loaded</div>
+    </div>
+    <div class="ui-row">
+      <div id="timer"></div>
+    </div>
+  </div>
+
+  <canvas id="world"></canvas>
+  <canvas id="minimap"></canvas>
+  <input id="folderInput" type="file" multiple style="display:none">
+  <audio id="player"></audio>
+  <script src="app.js"></script>
+</body>
+</html>
