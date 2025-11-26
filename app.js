@@ -38,6 +38,11 @@ const trackDisplay = document.getElementById('track');
 const timerDisplay = document.getElementById('timer');
 const player = document.getElementById('player');
 
+// NEW: transport controls
+const prevBtn = document.getElementById('prevBtn');
+const playPauseBtn = document.getElementById('playPauseBtn');
+const nextBtn = document.getElementById('nextBtn');
+
 // Audio graph
 let audioCtx = null;
 let analyser = null;
@@ -201,6 +206,125 @@ relaxBtn.onclick = () => {
     player.onended = null;
   }
 };
+
+// ---------- Transport helpers ----------
+
+function getCurrentIndex(){
+  if (!current || !islands.length) return -1;
+  return islands.findIndex(i => i.id === current.id);
+}
+
+function playByIndex(index){
+  if (!islands.length) return;
+
+  const wrapped = (index % islands.length + islands.length) % islands.length;
+  const isl = islands[wrapped];
+  playIsland(isl);
+}
+
+// If the user uses transport, exit Relax/Shuffle mode
+function exitRelaxModeIfNeeded(){
+  if (!relaxMode) return;
+  relaxMode = false;
+  shuffleMode = false;
+  if (relaxBtn){
+    relaxBtn.classList.remove('on');
+    relaxBtn.textContent = "Relax Mode";
+  }
+  mini.style.opacity = 1;
+  player.onended = null;
+}
+
+// ---------- Transport buttons ----------
+
+if (prevBtn){
+  prevBtn.onclick = () => {
+    if (!islands.length){
+      trackDisplay.textContent = "Choose music first";
+      return;
+    }
+    exitRelaxModeIfNeeded();
+    let idx = getCurrentIndex();
+    if (idx === -1) idx = 0;
+    else idx = idx - 1;
+    playByIndex(idx);
+
+    // ensure audio is unlocked / playing
+    if (!audioUnlocked){
+      initAudioGraph();
+      player.play().then(() => {
+        audioUnlocked = true;
+        if (audioBtn) audioBtn.style.display = 'none';
+      }).catch(console.error);
+    }
+  };
+}
+
+if (nextBtn){
+  nextBtn.onclick = () => {
+    if (!islands.length){
+      trackDisplay.textContent = "Choose music first";
+      return;
+    }
+    exitRelaxModeIfNeeded();
+    let idx = getCurrentIndex();
+    if (idx === -1) idx = 0;
+    else idx = idx + 1;
+    playByIndex(idx);
+
+    if (!audioUnlocked){
+      initAudioGraph();
+      player.play().then(() => {
+        audioUnlocked = true;
+        if (audioBtn) audioBtn.style.display = 'none';
+      }).catch(console.error);
+    }
+  };
+}
+
+if (playPauseBtn){
+  playPauseBtn.onclick = () => {
+    if (!audioUnlocked){
+      // First-time unlock / start
+      if (!islands.length){
+        trackDisplay.textContent = "Choose music first";
+        return;
+      }
+      if (!current){
+        current = islands[0];
+        trackDisplay.textContent = current.name;
+        player.src = URL.createObjectURL(current.file);
+      }
+      exitRelaxModeIfNeeded();
+      initAudioGraph();
+      player.play().then(() => {
+        audioUnlocked = true;
+        if (audioBtn) audioBtn.style.display = 'none';
+        playPauseBtn.textContent = "Pause";
+      }).catch(console.error);
+      return;
+    }
+
+    // toggle play / pause
+    exitRelaxModeIfNeeded();
+    if (player.paused){
+      player.play().then(() => {
+        playPauseBtn.textContent = "Pause";
+      }).catch(console.error);
+    } else {
+      player.pause();
+      playPauseBtn.textContent = "Play";
+    }
+  };
+}
+
+// Keep Play/Pause button label in sync with actual audio state
+player.addEventListener('play', () => {
+  if (playPauseBtn) playPauseBtn.textContent = "Pause";
+});
+player.addEventListener('pause', () => {
+  if (playPauseBtn) playPauseBtn.textContent = "Play";
+});
 
 function clusterKeyForFile(file){
   if (file.webkitRelativePath){
@@ -378,6 +502,11 @@ function playIsland(isl){
   if (audioUnlocked){
     initAudioGraph();
     player.play().catch(err => console.error('Play error:', err));
+  }
+
+  // keep the transport UI in sync
+  if (playPauseBtn && audioUnlocked){
+    playPauseBtn.textContent = "Pause";
   }
 }
 
