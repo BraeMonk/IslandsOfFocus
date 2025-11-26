@@ -1,0 +1,93 @@
+
+:root{
+  --ui-bg: rgba(3,8,20,0.78);
+  --accent: #4ea1ff;
+}
+*{box-sizing:border-box;}
+html,body{
+  margin:0;
+  padding:0;
+  width:100%;
+  height:100%;
+}
+body{
+  background:radial-gradient(circle at top,#12233b,#020611);
+  color:#f5f5f5;
+  font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+  overflow:hidden;
+}
+#world{
+  width:100vw;
+  height:100vh;
+  display:block;
+  touch-action:none;
+}
+#ui{
+  position:fixed;
+  top:env(safe-area-inset-top, 12px);
+  left:env(safe-area-inset-left, 12px);
+  padding:10px 12px;
+  border-radius:12px;
+  background:var(--ui-bg);
+  backdrop-filter:blur(16px);
+  box-shadow:0 18px 40px rgba(0,0,0,0.45);
+  z-index:10;
+  min-width:260px;
+}
+.ui-row{
+  display:flex;
+  align-items:center;
+  justify-content:flex-start;
+  gap:8px;
+  margin-bottom:6px;
+}
+button{
+  padding:8px 14px;
+  border-radius:999px;
+  border:none;
+  background:var(--accent);
+  color:#020611;
+  font-weight:600;
+  cursor:pointer;
+  font-size:0.9rem;
+  box-shadow:0 8px 20px rgba(78,161,255,0.35);
+  transition:transform 0.15s ease, box-shadow 0.15s ease, background 0.2s ease;
+}
+button:hover{
+  transform:translateY(-1px);
+  box-shadow:0 12px 26px rgba(78,161,255,0.45);
+}
+button:active{
+  transform:translateY(0);
+  box-shadow:0 6px 16px rgba(78,161,255,0.25);
+}
+#track{
+  font-size:0.8rem;
+  max-width:260px;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  opacity:0.9;
+}
+#timer{
+  font-size:0.85rem;
+  font-weight:500;
+  color:#ffd36b;
+}
+
+/* Mobile tweaks */
+@media (max-width: 600px){
+  #ui{
+    min-width:0;
+    right:env(safe-area-inset-right, 12px);
+    left:auto;
+    max-width:60vw;
+  }
+  button{
+    padding:6px 10px;
+    font-size:0.8rem;
+  }
+  #track{
+    max-width:50vw;
+  }
+}
