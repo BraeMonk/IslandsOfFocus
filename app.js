@@ -49,21 +49,30 @@ let analyser = null;
 let dataArray = null;
 let audioUnlocked = false;
 let audioLevel = 0;
+let mediaSourceNode = null; // NEW: keep a reference
 
 function initAudioGraph(){
+  const AC = window.AudioContext || window.webkitAudioContext;
+  if (!AC) return;
+
   if (!audioCtx){
-    const AC = window.AudioContext || window.webkitAudioContext;
-    if (!AC) return;
     audioCtx = new AC();
-    analyser = audioCtx.createAnalyser();
-    analyser.fftSize = 2048;
-    const source = audioCtx.createMediaElementSource(player);
-    source.connect(analyser);
-    analyser.connect(audioCtx.destination);
-    dataArray = new Uint8Array(analyser.fftSize);
   }
+
   if (audioCtx.state === 'suspended'){
     audioCtx.resume();
+  }
+
+  if (!analyser){
+    analyser = audioCtx.createAnalyser();
+    analyser.fftSize = 2048;
+    dataArray = new Uint8Array(analyser.fftSize);
+  }
+
+  if (!mediaSourceNode){
+    mediaSourceNode = audioCtx.createMediaElementSource(player);
+    mediaSourceNode.connect(analyser);
+    analyser.connect(audioCtx.destination);
   }
 }
 
@@ -147,26 +156,33 @@ focusBtn.onclick = () => {
   }
 };
 
-audioBtn.onclick = () => {
+audioBtn.onclick = async () => {
   if (!islands.length && !current){
     trackDisplay.textContent = "Choose music first";
     return;
   }
 
-  initAudioGraph();
-
+  // If nothing is selected yet, default to first island
   if (!current && islands.length){
     current = islands[0];
     trackDisplay.textContent = current.name;
     player.src = URL.createObjectURL(current.file);
   }
 
-  player.play().then(() => {
+  try {
+    // FIRST: ask the plain audio element to play (inside user gesture)
+    await player.play();
+
+    // If we got here, audio is unlocked on this device
     audioUnlocked = true;
     audioBtn.style.display = 'none';
-  }).catch(err => {
+
+    // THEN: attach audio graph for visualizer
+    initAudioGraph();
+  } catch (err) {
     console.error('Audio play blocked:', err);
-  });
+    trackDisplay.textContent = 'Tap "Start Audio" again to allow sound on iOS';
+  }
 };
 
 relaxBtn.onclick = () => {
@@ -296,12 +312,18 @@ if (playPauseBtn){
         player.src = URL.createObjectURL(current.file);
       }
       exitRelaxModeIfNeeded();
-      initAudioGraph();
-      player.play().then(() => {
-        audioUnlocked = true;
-        if (audioBtn) audioBtn.style.display = 'none';
-        playPauseBtn.textContent = "Pause";
-      }).catch(console.error);
+      (async () => {
+        try {
+          await player.play();
+          audioUnlocked = true;
+          if (audioBtn) audioBtn.style.display = 'none';
+          playPauseBtn.textContent = "Pause";
+          initAudioGraph();
+        } catch (err){
+          console.error('Play/Pause unlock blocked:', err);
+          trackDisplay.textContent = 'Tap play again to allow sound on iOS';
+        }
+      })();
       return;
     }
 
