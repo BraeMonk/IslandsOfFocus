@@ -44,7 +44,16 @@
 
   <canvas id="world"></canvas>
   <canvas id="minimap"></canvas>
-  <input id="folderInput" type="file" multiple style="display:none">
+  <input 
+    type="file" 
+    id="folderInput" 
+    multiple 
+    webkitdirectory 
+    directory 
+    mozdirectory 
+    accept="audio/*"
+    style="display:none"
+  />
   <audio id="player"></audio>
   <script src="app.js"></script>
 </body>
