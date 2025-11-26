@@ -603,8 +603,8 @@ function drawBackground(){
     }
   }
 
-  // ✨ CONSTELLATION LINES ✨
-  // Deterministic pseudo-random positions, stable across frames
+  // 🌌 DYNAMIC CONSTELLATIONS 🌌
+  // Positions live on a warped ring around screen center, gently orbiting + reacting to audioLevel
   const CONST_COUNT = 28;
   const constPoints = [];
   const centerX = vw / 2;
@@ -613,21 +613,36 @@ function drawBackground(){
   const radiusJitter = Math.min(vw, vh) * 0.18;
 
   for (let i = 0; i < CONST_COUNT; i++){
-    const ang = (i / CONST_COUNT) * Math.PI * 2 + i * 0.37;
-    const r = baseRadius + radiusJitter * ((Math.sin(i * 1.31) + 1) * 0.5);
+    const angBase = (i / CONST_COUNT) * Math.PI * 2 + i * 0.37;
+
+    // small angular wobble over time
+    const ang = angBase + Math.sin(time * 0.12 + i * 0.9) * 0.08;
+
+    // breathing radius, slightly stronger with audioLevel
+    const breath = (Math.sin(time * 0.2 + i * 1.31) + 1) * 0.5;
+    const audioInflate = 1 + audioLevel * 0.45;
+    const r = (baseRadius + radiusJitter * breath) * audioInflate;
+
     const x = centerX + Math.cos(ang) * r;
     const y = centerY + Math.sin(ang) * r;
-    constPoints.push({ x, y });
+    constPoints.push({ x, y, idx: i });
   }
 
   ctx.save();
-  ctx.globalAlpha = 0.35 * (0.4 + nightFactor * 0.6); // stronger at "night"
-  ctx.lineWidth = 0.9;
-  ctx.strokeStyle = 'rgba(180,210,255,0.85)';
+
+  // line intensity responds to night + audio
+  const lineEnergy = 0.25 + nightFactor * 0.4 + audioLevel * 0.7;
+  ctx.globalAlpha = Math.min(0.75, lineEnergy);
+  ctx.lineWidth = 0.6 + audioLevel * 1.4;
+  ctx.strokeStyle = 'rgba(180,210,255,0.9)';
 
   // connect in soft "chains" to feel like constellations
   const groupSize = 4;
+  const activeGroup = Math.floor((time * 0.18) % Math.ceil(CONST_COUNT / groupSize));
+
   for (let start = 0; start < CONST_COUNT; start += groupSize){
+    const groupIndex = start / groupSize;
+
     ctx.beginPath();
     for (let j = 0; j < groupSize && start + j < CONST_COUNT; j++){
       const p = constPoints[start + j];
@@ -637,16 +652,31 @@ function drawBackground(){
         ctx.lineTo(p.x, p.y);
       }
     }
-    ctx.stroke();
+
+    // slightly boost the "active" constellation group
+    if (groupIndex === activeGroup){
+      const boost = 0.3 + audioLevel * 0.8;
+      ctx.save();
+      ctx.globalAlpha = Math.min(1, ctx.globalAlpha + boost);
+      ctx.stroke();
+      ctx.restore();
+    } else {
+      ctx.stroke();
+    }
   }
 
   // tiny glowing nodes at the constellation points
   for (const p of constPoints){
+    // node size + alpha gently react to audio
+    const nodeSize = 1.8 + audioLevel * 1.4;
+    const nodeAlpha = 0.6 + audioLevel * 0.4;
+
     ctx.beginPath();
-    ctx.arc(p.x, p.y, 2.2, 0, Math.PI * 2);
-    ctx.fillStyle = 'rgba(235,245,255,0.9)';
+    ctx.arc(p.x, p.y, nodeSize, 0, Math.PI * 2);
+    ctx.fillStyle = `rgba(235,245,255,${nodeAlpha})`;
     ctx.fill();
   }
+
   ctx.restore();
 
   // tiny dust / grain layer
