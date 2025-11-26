@@ -436,6 +436,52 @@ function drawBackground(){
     }
   }
 
+  // ✨ CONSTELLATION LINES ✨
+  // Deterministic pseudo-random positions, stable across frames
+  const CONST_COUNT = 28;
+  const constPoints = [];
+  const centerX = vw / 2;
+  const centerY = vh / 2;
+  const baseRadius = Math.min(vw, vh) * 0.25;
+  const radiusJitter = Math.min(vw, vh) * 0.18;
+
+  for (let i = 0; i < CONST_COUNT; i++){
+    const ang = (i / CONST_COUNT) * Math.PI * 2 + i * 0.37;
+    const r = baseRadius + radiusJitter * ((Math.sin(i * 1.31) + 1) * 0.5);
+    const x = centerX + Math.cos(ang) * r;
+    const y = centerY + Math.sin(ang) * r;
+    constPoints.push({ x, y });
+  }
+
+  ctx.save();
+  ctx.globalAlpha = 0.35 * (0.4 + nightFactor * 0.6); // stronger at "night"
+  ctx.lineWidth = 0.9;
+  ctx.strokeStyle = 'rgba(180,210,255,0.85)';
+
+  // connect in soft "chains" to feel like constellations
+  const groupSize = 4;
+  for (let start = 0; start < CONST_COUNT; start += groupSize){
+    ctx.beginPath();
+    for (let j = 0; j < groupSize && start + j < CONST_COUNT; j++){
+      const p = constPoints[start + j];
+      if (j === 0){
+        ctx.moveTo(p.x, p.y);
+      } else {
+        ctx.lineTo(p.x, p.y);
+      }
+    }
+    ctx.stroke();
+  }
+
+  // tiny glowing nodes at the constellation points
+  for (const p of constPoints){
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, 2.2, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(235,245,255,0.9)';
+    ctx.fill();
+  }
+  ctx.restore();
+
   // tiny dust / grain layer
   const dustCount = 90;
   ctx.save();
