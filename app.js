@@ -26,6 +26,9 @@ const focusBtn  = document.getElementById('focusBtn');
 const trackDisplay = document.getElementById('track');
 const timerDisplay = document.getElementById('timer');
 const player = document.getElementById('player');
+const audioBtn = document.getElementById('audioBtn');
+let audioUnlocked = false;
+
 
 // World state
 let islands = [];
@@ -104,6 +107,22 @@ focusBtn.onclick = () => {
   }
 };
 
+audioBtn.onclick = () => {
+  if (!current && islands.length) {
+    // pick first island as default if nothing active yet
+    current = islands[0];
+    trackDisplay.textContent = current.name;
+    player.src = URL.createObjectURL(current.file);
+  }
+
+  player.play().then(() => {
+    audioUnlocked = true;
+    audioBtn.style.display = 'none'; // hide once unlocked
+  }).catch(err => {
+    console.error('Audio play blocked:', err);
+  });
+};
+
 function generateWorld(files){
   islands = [];
   const cx = 0;
@@ -141,6 +160,12 @@ function generateWorld(files){
   ship.trail = [];
   current = null;
   trackDisplay.textContent = "Sail to an island to begin...";
+}
+
+if (islands.length) {
+  current = islands[0];
+  trackDisplay.textContent = current.name;
+  player.src = URL.createObjectURL(current.file);
 }
 
 // Update loop
@@ -203,7 +228,12 @@ function playIsland(isl){
   trackDisplay.textContent = isl.name;
   const url = URL.createObjectURL(isl.file);
   player.src = url;
-  player.play();
+
+  if (audioUnlocked) {
+    player.play().catch(err => {
+      console.error('Play error:', err);
+    });
+  }
 }
 
 // compute island position including its orbit
