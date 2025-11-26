@@ -239,24 +239,40 @@ function generateWorld(files){
     const hueBase = (ci / clusterCount) * 360;
 
     clusterFiles.forEach((file, i) => {
-      const t = (i + 0.5) / clusterFiles.length - 0.5;
-      const angle = centerAngle + t * clusterArc * 0.7;
-      const radiusJitter = (Math.random() - 0.5) * 160;
-      const r = baseRadius + radiusJitter;
+
+      // Spread islands more variably across the arc.
+      const localT = (i + Math.random()*0.5) / clusterFiles.length;
+      const angle = centerAngle + (localT - 0.5) * clusterArc * (0.6 + Math.random()*0.4);
+    
+      // HUGE improvement: clusters spawn at different radii.
+      const clusterRadius = baseRadius 
+        + (Math.random() - 0.5) * 900      // major ring variation
+        + (ci % 2 === 0 ? Math.random()*500 : -Math.random()*500); // alternating bias
+    
+      // Each island also gets its own little offset around the cluster radius.
+      const radialOffset = (Math.random() - 0.5) * 450;
+    
+      const r = clusterRadius + radialOffset;
+    
+      // Convert polar coords
       const x = cx + Math.cos(angle) * r;
       const y = cy + Math.sin(angle) * r;
-
+    
+      // Add subtle Z-depth illusion (affects glow + brightness)
+      const depth = Math.random()*0.6 + 0.7; // 0.7—1.3 range
+    
       islands.push({
         id: islands.length,
         file,
         name: file.name.replace(/\.[^/.]+$/, ''),
         baseX: x,
         baseY: y,
-        orbitAmp: 6 + Math.random() * 10,
-        orbitSpeed: 0.1 + Math.random() * 0.25,
+        orbitAmp: 20 + Math.random()*40,      // larger, slower floating
+        orbitSpeed: 0.03 + Math.random()*0.12,
         orbitPhase: Math.random() * Math.PI * 2,
-        radius: 70,
-        hue: (hueBase + (i / Math.max(1, clusterFiles.length)) * 30) % 360,
+        radius: 55 + Math.random()*35,        // some bigger, some smaller
+        depth,
+        hue: (hueBase + (i * 18) + Math.random()*20) % 360,
         cluster: key
       });
     });
