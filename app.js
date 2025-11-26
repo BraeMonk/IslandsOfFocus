@@ -379,59 +379,110 @@ function drawBackground(){
   ctx.save();
   ctx.scale(DPR, DPR);
 
-  const dayT = (time * 0.01) % 1;
-  const nightFactor = 0.5 - 0.5 * Math.cos(dayT * Math.PI * 2);
+  // day-night-like modulation but spacey
+  const cycle = (time * 0.01) % 1;
+  const nightFactor = 0.5 - 0.5 * Math.cos(cycle * 2 * Math.PI); // 0..1
 
-  const skyTop = `hsl(${220 - nightFactor*15}, 45%, ${18 + nightFactor*8}%)`;
-  const skyMid = `hsl(${215 - nightFactor*10}, 50%, ${10 + nightFactor*10}%)`;
-  const skyBottom = `hsl(${210 - nightFactor*5}, 60%, ${4 + nightFactor*6}%)`;
-
+  // layered nebula gradients
   const sky = ctx.createLinearGradient(0, 0, 0, vh);
-  sky.addColorStop(0, skyTop);
-  sky.addColorStop(0.5, skyMid);
-  sky.addColorStop(1, skyBottom);
+  sky.addColorStop(0, `hsl(${230 - nightFactor*10}, 55%, ${16 + nightFactor*6}%)`);
+  sky.addColorStop(0.4, `hsl(${260 - nightFactor*20}, 55%, ${10 + nightFactor*4}%)`);
+  sky.addColorStop(1, `hsl(${220 - nightFactor*5}, 55%, ${4 + nightFactor*2}%)`);
   ctx.fillStyle = sky;
   ctx.fillRect(0, 0, vw, vh);
 
-  const starCount = 80;
-  for (let i = 0; i < starCount; i++){
-    const sx = (i * 97 % vw);
-    const sy = (i * 53 % vh);
-    const twinkle = 0.5 + 0.5 * Math.sin(time * 0.8 + i);
-    const alpha = 0.02 + nightFactor * 0.12 * twinkle;
-    ctx.fillStyle = `rgba(255,255,255,${alpha})`;
-    ctx.fillRect(sx, sy, 1.5, 1.5);
+  // big nebula bands
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+
+  const nebula1 = ctx.createRadialGradient(
+    vw * 0.3, vh * 0.2, 0,
+    vw * 0.1, vh * 0.0, vh * 0.8
+  );
+  nebula1.addColorStop(0, 'rgba(180,120,255,0.32)');
+  nebula1.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = nebula1;
+  ctx.fillRect(0, 0, vw, vh);
+
+  const nebula2 = ctx.createRadialGradient(
+    vw * 0.8, vh * 0.6, 0,
+    vw * 1.0, vh * 0.9, vh * 0.9
+  );
+  nebula2.addColorStop(0, 'rgba(120,200,255,0.26)');
+  nebula2.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = nebula2;
+  ctx.fillRect(0, 0, vw, vh);
+
+  ctx.restore();
+
+  // a LOT more stars (3 layers for parallax)
+  const baseStars = 140;
+  const parallaxLayers = 3;
+  for (let layer = 0; layer < parallaxLayers; layer++){
+    const depth = (layer + 1) / parallaxLayers;
+    const count = baseStars + layer * 40;
+    const twinkleScale = 0.5 + depth * 0.7;
+
+    for (let i = 0; i < count; i++){
+      const offset = i * 97 * (layer + 3);
+      const sx = offset % vw;
+      const sy = (i * 53 * (layer + 5)) % vh;
+      const twinkle = 0.5 + 0.5 * Math.sin(time * (0.6 + depth*0.8) + offset);
+      const alpha = (0.03 + nightFactor * 0.18) * twinkle * twinkleScale;
+      const size = layer === 0 ? 1 : layer === 1 ? 1.5 : 2;
+
+      ctx.fillStyle = `rgba(255,255,255,${alpha})`;
+      ctx.fillRect(sx, sy, size, size);
+    }
   }
 
-  const waveOffset = time * 12;
-  const oceanTop = `hsl(${205 - nightFactor*10}, 40%, ${16 - nightFactor*4}%)`;
-  const oceanBottom = `hsl(${200 - nightFactor*5}, 55%, ${6 - nightFactor*2}%)`;
-  const grad = ctx.createLinearGradient(0, vh*0.4, 0, vh);
-  grad.addColorStop(0, oceanTop);
-  grad.addColorStop(1, oceanBottom);
-  ctx.fillStyle = grad;
-  ctx.fillRect(0, vh*0.4, vw, vh*0.6);
-
+  // tiny dust / grain layer
+  const dustCount = 90;
   ctx.save();
-  ctx.globalAlpha = 0.2 + nightFactor*0.05;
+  ctx.globalAlpha = 0.08;
+  for (let i = 0; i < dustCount; i++){
+    const sx = (Math.sin(i * 12.9898 + time * 0.3) * 43758.5453) % vw;
+    const sy = (Math.sin(i * 78.233  + time * 0.25) * 12345.6789) % vh;
+    const x = (sx + vw) % vw;
+    const y = (sy + vh) % vh;
+    ctx.fillStyle = 'rgba(255,255,255,0.4)';
+    ctx.fillRect(x, y, 1, 1);
+  }
+  ctx.restore();
+
+  // smaller water band at the bottom
+  const waterTop = vh * 0.78;
+  const oceanGrad = ctx.createLinearGradient(0, waterTop, 0, vh);
+  oceanGrad.addColorStop(0, `rgba(6,40,70,0.75)`);
+  oceanGrad.addColorStop(1, `rgba(1,10,20,0.95)`);
+  ctx.fillStyle = oceanGrad;
+  ctx.fillRect(0, waterTop, vw, vh - waterTop);
+
+  // subtle ripple waves
+  ctx.save();
   ctx.beginPath();
-  const waveHeight = 18;
-  const waveLength = 220;
-  ctx.moveTo(0, vh*0.55);
-  for (let x = 0; x <= vw; x += 10){
-    const y = vh*0.55 + Math.sin((x + waveOffset) / waveLength) * waveHeight;
+  const waveOffset = time * 10;
+  const waveHeight = 10;
+  const waveLength = 200;
+  ctx.moveTo(0, waterTop);
+  for (let x = 0; x <= vw; x += 8){
+    const y = waterTop + Math.sin((x + waveOffset) / waveLength) * waveHeight;
     ctx.lineTo(x, y);
   }
   ctx.lineTo(vw, vh);
   ctx.lineTo(0, vh);
   ctx.closePath();
-  ctx.fillStyle = '#0b2740';
+  ctx.fillStyle = 'rgba(40,110,170,0.22)';
   ctx.fill();
   ctx.restore();
 
-  const vg = ctx.createRadialGradient(vw/2, vh/2, Math.min(vw,vh)/4, vw/2, vh/2, Math.max(vw,vh)/1.1);
+  // vignette over everything
+  const vg = ctx.createRadialGradient(
+    vw/2, vh/2, Math.min(vw,vh)/3,
+    vw/2, vh/2, Math.max(vw,vh)/1.05
+  );
   vg.addColorStop(0, 'rgba(0,0,0,0)');
-  vg.addColorStop(1, 'rgba(0,0,0,0.55)');
+  vg.addColorStop(1, 'rgba(0,0,0,0.65)');
   ctx.fillStyle = vg;
   ctx.fillRect(0,0,vw,vh);
 
