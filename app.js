@@ -42,6 +42,50 @@ const trackDisplay = document.getElementById('track');
 const timerDisplay = document.getElementById('timer');
 const player = document.getElementById('player');
 
+// --- iOS / AirPods / Bluetooth playback helpers ---
+
+if (player){
+  // Avoid full-screen hijack / weird routing
+  player.setAttribute('playsinline', '');
+  player.setAttribute('webkit-playsinline', '');
+  player.setAttribute('x-webkit-airplay', 'allow');
+  player.autoplay = false;
+}
+
+let iosBluetoothPrimed = false;
+
+// Prime iOS Bluetooth / AirPods so audio routes as "media" instead of call profile
+async function primeIOSBluetoothOnce(){
+  if (!isIOS || iosBluetoothPrimed || !player) return;
+
+  try {
+    const prevSrc = player.src;
+    const prevTime = player.currentTime || 0;
+    const wasPaused = player.paused;
+
+    // 1-frame silent WAV – just enough to establish media playback
+    player.src = "data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAESsAACJWAAACABAAZGF0YQAQAAAA";
+
+    await player.play().catch(() => {});
+    // tiny delay to let iOS flip the routing
+    await new Promise(r => setTimeout(r, 60));
+    player.pause();
+
+    // restore previous src if there was one
+    player.src = prevSrc;
+    if (prevSrc){
+      player.currentTime = prevTime;
+      if (!wasPaused){
+        player.play().catch(() => {});
+      }
+    }
+
+    iosBluetoothPrimed = true;
+  } catch (err){
+    console.warn("primeIOSBluetoothOnce failed:", err);
+  }
+}
+
 // NEW: transport controls
 const prevBtn = document.getElementById('prevBtn');
 const playPauseBtn = document.getElementById('playPauseBtn');
@@ -184,6 +228,11 @@ audioBtn.onclick = async () => {
     return;
   }
 
+  // Prime iOS AirPods / Bluetooth routing once before real playback
+  if (isIOS){
+    await primeIOSBluetoothOnce();
+  }
+
   // If nothing is selected yet, default to first island
   if (!current && islands.length){
     current = islands[0];
@@ -199,7 +248,7 @@ audioBtn.onclick = async () => {
     audioUnlocked = true;
     audioBtn.style.display = 'none';
 
-    // THEN: attach audio graph for visualizer
+    // THEN: attach audio graph for visualizer (no-op on iOS)
     initAudioGraph();
   } catch (err) {
     console.error('Audio play blocked:', err);
@@ -207,7 +256,7 @@ audioBtn.onclick = async () => {
   }
 };
 
-relaxBtn.onclick = () => {
+relaxBtn.onclick = async () => {
   if (!relaxMode){
     if (!islands.length){
       trackDisplay.textContent = "Choose music first";
@@ -221,6 +270,11 @@ relaxBtn.onclick = () => {
     mini.style.opacity = 0.25;
 
     if (!audioUnlocked){
+      // Prime iOS Bluetooth path before autoplay
+      if (isIOS){
+        await primeIOSBluetoothOnce();
+      }
+
       initAudioGraph();
       if (!current){
         current = islands[0];
