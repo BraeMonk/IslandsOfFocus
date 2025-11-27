@@ -230,7 +230,7 @@ audioBtn.onclick = async () => {
 
   // Prime iOS AirPods / Bluetooth routing once before real playback
   if (isIOS){
-    await primeIOSBluetoothOnce();
+    primeIOSBluetoothOnce();
   }
 
   // If nothing is selected yet, default to first island
@@ -270,9 +270,9 @@ relaxBtn.onclick = async () => {
     mini.style.opacity = 0.25;
 
     if (!audioUnlocked){
-      // Prime iOS Bluetooth path before autoplay
+      // Prime iOS Bluetooth path before autoplay (fire-and-forget)
       if (isIOS){
-        await primeIOSBluetoothOnce();
+        primeIOSBluetoothOnce();
       }
 
       initAudioGraph();
