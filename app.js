@@ -47,6 +47,48 @@ const prevBtn = document.getElementById('prevBtn');
 const playPauseBtn = document.getElementById('playPauseBtn');
 const nextBtn = document.getElementById('nextBtn');
 
+// --- Media Session helpers (lock screen metadata) ---
+function updateMediaMetadata(isl){
+  if (!('mediaSession' in navigator)) return;
+  if (!isl){
+    navigator.mediaSession.metadata = null;
+    return;
+  }
+
+  navigator.mediaSession.metadata = new MediaMetadata({
+    title: isl.name || 'Galaxy Track',
+    artist: isl.cluster || 'Local Library',
+    album: 'Music Galaxy',
+    artwork: [
+      // adjust paths if you have specific icons for this app
+      { src: 'icons/icon-192.png', sizes: '192x192', type: 'image/png' },
+      { src: 'icons/icon-512.png', sizes: '512x512', type: 'image/png' }
+    ]
+  });
+}
+
+function setupMediaSessionControls(){
+  if (!('mediaSession' in navigator)) return;
+
+  try {
+    navigator.mediaSession.setActionHandler('play', () => {
+      player.play().catch(() => {});
+    });
+    navigator.mediaSession.setActionHandler('pause', () => {
+      player.pause();
+    });
+    navigator.mediaSession.setActionHandler('previoustrack', () => {
+      if (prevBtn) prevBtn.click();
+    });
+    navigator.mediaSession.setActionHandler('nexttrack', () => {
+      if (nextBtn) nextBtn.click();
+    });
+  } catch (e){
+    // some browsers throw if an action isn't supported; ignore
+    console.warn('MediaSession handlers error:', e);
+  }
+}
+
 // Audio graph
 let audioCtx = null;
 let analyser = null;
@@ -390,12 +432,18 @@ if (playPauseBtn){
   };
 }
 
-// Keep Play/Pause button label in sync with actual audio state
 player.addEventListener('play', () => {
   if (playPauseBtn) playPauseBtn.textContent = "Pause";
+  if ('mediaSession' in navigator){
+    navigator.mediaSession.playbackState = 'playing';
+  }
 });
+
 player.addEventListener('pause', () => {
   if (playPauseBtn) playPauseBtn.textContent = "Play";
+  if ('mediaSession' in navigator){
+    navigator.mediaSession.playbackState = 'paused';
+  }
 });
 
 function clusterKeyForFile(file){
@@ -579,6 +627,9 @@ function playIsland(isl){
   trackDisplay.textContent = isl.name;
   const url = URL.createObjectURL(isl.file);
   player.src = url;
+
+  // 🔹 Update lock-screen metadata
+  updateMediaMetadata(isl);
 
   if (audioUnlocked){
     initAudioGraph();
@@ -1001,6 +1052,8 @@ function drawMinimap(){
   ctxM.fillStyle = 'rgba(255,255,255,1)';
   ctxM.fill();
 }
+
+setupMediaSessionControls();
 
 let lastTime = performance.now();
 function loop(now){
