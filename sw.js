@@ -1,5 +1,5 @@
 
-const CACHE_NAME = 'islands-of-focus-v9';
+const CACHE_NAME = 'islands-of-focus-v10';
 const ASSETS = [
   './',
   './index.html',
