@@ -546,15 +546,39 @@ function drawBackground(){
   ctx.save();
   ctx.scale(DPR, DPR);
 
-  // day-night-like modulation but spacey
+  // day-night-like modulation
   const cycle = (time * 0.01) % 1;
   const nightFactor = 0.5 - 0.5 * Math.cos(cycle * 2 * Math.PI); // 0..1
 
+  // mood tint
+  // base: deep blue / violet
+  // focus: darker, more blue
+  // relax: warmer, more magenta / teal
+  let hueBase = 230;
+  let satBase = 55;
+  let lightBaseTop = 16;
+  let lightBaseMid = 10;
+  let lightBaseBottom = 4;
+
+  if (focusMode){
+    hueBase = 220;
+    satBase = 50;
+    lightBaseTop = 10;
+    lightBaseMid = 7;
+    lightBaseBottom = 3;
+  } else if (relaxMode){
+    hueBase = 250;
+    satBase = 65;
+    lightBaseTop = 20;
+    lightBaseMid = 13;
+    lightBaseBottom = 6;
+  }
+
   // layered nebula gradients
   const sky = ctx.createLinearGradient(0, 0, 0, vh);
-  sky.addColorStop(0, `hsl(${230 - nightFactor*10}, 55%, ${16 + nightFactor*6}%)`);
-  sky.addColorStop(0.4, `hsl(${260 - nightFactor*20}, 55%, ${10 + nightFactor*4}%)`);
-  sky.addColorStop(1, `hsl(${220 - nightFactor*5}, 55%, ${4 + nightFactor*2}%)`);
+  sky.addColorStop(0, `hsl(${hueBase - nightFactor*10}, ${satBase}%, ${lightBaseTop + nightFactor*6}%)`);
+  sky.addColorStop(0.4, `hsl(${hueBase + 30 - nightFactor*20}, ${satBase}%, ${lightBaseMid + nightFactor*4}%)`);
+  sky.addColorStop(1, `hsl(${hueBase - 10 - nightFactor*5}, ${satBase}%, ${lightBaseBottom + nightFactor*2}%)`);
   ctx.fillStyle = sky;
   ctx.fillRect(0, 0, vw, vh);
 
@@ -603,81 +627,49 @@ function drawBackground(){
     }
   }
 
-  // 🌌 DYNAMIC CONSTELLATIONS 🌌
-  // Positions live on a warped ring around screen center, gently orbiting + reacting to audioLevel
-  const CONST_COUNT = 28;
-  const constPoints = [];
-  const centerX = vw / 2;
-  const centerY = vh / 2;
-  const baseRadius = Math.min(vw, vh) * 0.25;
-  const radiusJitter = Math.min(vw, vh) * 0.18;
+  // 🌌 AUDIO-REACTIVE AURORA BELT
+  // gently waves across the top third of the screen, intensity driven by audioLevel
+  const auroraHeight = vh * 0.35;
+  const auroraBaseY = vh * 0.18;
+  const auroraIntensity = (0.18 + nightFactor * 0.25 + audioLevel * 0.8);
 
-  for (let i = 0; i < CONST_COUNT; i++){
-    const angBase = (i / CONST_COUNT) * Math.PI * 2 + i * 0.37;
+  if (auroraIntensity > 0.05){
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
 
-    // small angular wobble over time
-    const ang = angBase + Math.sin(time * 0.12 + i * 0.9) * 0.08;
+    const grad = ctx.createLinearGradient(0, auroraBaseY - auroraHeight*0.5, 0, auroraBaseY + auroraHeight*0.5);
+    const hueA = hueBase + 40;
+    const hueB = hueBase - 20;
 
-    // breathing radius, slightly stronger with audioLevel
-    const breath = (Math.sin(time * 0.2 + i * 1.31) + 1) * 0.5;
-    const audioInflate = 1 + audioLevel * 0.45;
-    const r = (baseRadius + radiusJitter * breath) * audioInflate;
+    grad.addColorStop(0.0, `hsla(${hueA}, 80%, 75%, ${auroraIntensity * 0.0})`);
+    grad.addColorStop(0.2, `hsla(${hueA}, 80%, 75%, ${auroraIntensity * 0.5})`);
+    grad.addColorStop(0.5, `hsla(${hueB}, 85%, 70%, ${auroraIntensity * 0.9})`);
+    grad.addColorStop(0.8, `hsla(${hueA}, 80%, 78%, ${auroraIntensity * 0.45})`);
+    grad.addColorStop(1.0, `hsla(${hueB}, 80%, 60%, ${auroraIntensity * 0.0})`);
 
-    const x = centerX + Math.cos(ang) * r;
-    const y = centerY + Math.sin(ang) * r;
-    constPoints.push({ x, y, idx: i });
-  }
-
-  ctx.save();
-
-  // line intensity responds to night + audio
-  const lineEnergy = 0.25 + nightFactor * 0.4 + audioLevel * 0.7;
-  ctx.globalAlpha = Math.min(0.75, lineEnergy);
-  ctx.lineWidth = 0.6 + audioLevel * 1.4;
-  ctx.strokeStyle = 'rgba(180,210,255,0.9)';
-
-  // connect in soft "chains" to feel like constellations
-  const groupSize = 4;
-  const activeGroup = Math.floor((time * 0.18) % Math.ceil(CONST_COUNT / groupSize));
-
-  for (let start = 0; start < CONST_COUNT; start += groupSize){
-    const groupIndex = start / groupSize;
+    ctx.fillStyle = grad;
 
     ctx.beginPath();
-    for (let j = 0; j < groupSize && start + j < CONST_COUNT; j++){
-      const p = constPoints[start + j];
-      if (j === 0){
-        ctx.moveTo(p.x, p.y);
-      } else {
-        ctx.lineTo(p.x, p.y);
-      }
+    const waves = 3;
+    const amplitude = 18 + audioLevel * 40;
+    ctx.moveTo(0, auroraBaseY);
+
+    for (let x = 0; x <= vw; x += 8){
+      const t = x / vw;
+      const phase = time * 0.15;
+      const yOffset =
+        Math.sin(t * Math.PI * waves + phase) * amplitude +
+        Math.sin(t * Math.PI * 1.7 - phase * 0.7) * amplitude * 0.45;
+      ctx.lineTo(x, auroraBaseY + yOffset);
     }
 
-    // slightly boost the "active" constellation group
-    if (groupIndex === activeGroup){
-      const boost = 0.3 + audioLevel * 0.8;
-      ctx.save();
-      ctx.globalAlpha = Math.min(1, ctx.globalAlpha + boost);
-      ctx.stroke();
-      ctx.restore();
-    } else {
-      ctx.stroke();
-    }
-  }
-
-  // tiny glowing nodes at the constellation points
-  for (const p of constPoints){
-    // node size + alpha gently react to audio
-    const nodeSize = 1.8 + audioLevel * 1.4;
-    const nodeAlpha = 0.6 + audioLevel * 0.4;
-
-    ctx.beginPath();
-    ctx.arc(p.x, p.y, nodeSize, 0, Math.PI * 2);
-    ctx.fillStyle = `rgba(235,245,255,${nodeAlpha})`;
+    ctx.lineTo(vw, auroraBaseY + auroraHeight);
+    ctx.lineTo(0, auroraBaseY + auroraHeight);
+    ctx.closePath();
     ctx.fill();
-  }
 
-  ctx.restore();
+    ctx.restore();
+  }
 
   // tiny dust / grain layer
   const dustCount = 90;
@@ -719,13 +711,14 @@ function drawBackground(){
   ctx.fill();
   ctx.restore();
 
-  // vignette over everything
+  // vignette over everything (slight audio pulse)
+  const pulse = 0.15 + audioLevel * 0.45;
   const vg = ctx.createRadialGradient(
     vw/2, vh/2, Math.min(vw,vh)/3,
     vw/2, vh/2, Math.max(vw,vh)/1.05
   );
   vg.addColorStop(0, 'rgba(0,0,0,0)');
-  vg.addColorStop(1, 'rgba(0,0,0,0.65)');
+  vg.addColorStop(1, `rgba(0,0,0,${0.5 + pulse * 0.5})`);
   ctx.fillStyle = vg;
   ctx.fillRect(0,0,vw,vh);
 
@@ -803,6 +796,39 @@ function drawWorld(){
     ctx.textBaseline = 'middle';
     const label = isl.name.length > 16 ? isl.name.slice(0,15) + '…' : isl.name;
     ctx.fillText(label, sx, sy);
+
+    // 🔵 CURRENT ISLAND HIGHLIGHT ORBIT 🔵
+    if (current && current.id === isl.id){
+      const orbitRadius = r * 1.25;
+      const ringThickness = 2 + audioLevel * 4;
+
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+
+      // soft outer ring
+      ctx.beginPath();
+      ctx.arc(sx, sy, orbitRadius, 0, Math.PI * 2);
+      ctx.strokeStyle = `rgba(255,255,255,${0.25 + audioLevel * 0.5})`;
+      ctx.lineWidth = ringThickness;
+      ctx.stroke();
+
+      // orbiting sparks
+      const sparkCount = 5;
+      for (let s = 0; s < sparkCount; s++){
+        const ang = time * (0.5 + audioLevel*1.5) + (s * (Math.PI * 2 / sparkCount));
+        const sxOff = sx + Math.cos(ang) * orbitRadius;
+        const syOff = sy + Math.sin(ang) * orbitRadius;
+        const sparkSize = 3 + audioLevel * 4;
+
+        ctx.beginPath();
+        ctx.arc(sxOff, syOff, sparkSize, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(230,245,255,${0.5 + audioLevel * 0.5})`;
+        ctx.fill();
+      }
+
+      ctx.restore();
+    }
+    // 🔵 END CURRENT ISLAND HIGHLIGHT 🔵
   }
 
   ctx.save();
