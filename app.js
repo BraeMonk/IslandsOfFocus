@@ -4,6 +4,10 @@ const ctx = canvas.getContext('2d', { alpha: true });
 const mini = document.getElementById('minimap');
 const miniCtx = mini.getContext('2d');
 
+const isIOS =
+  /iP(ad|hone|od)/.test(navigator.userAgent) ||
+  (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+
 let DPR, W, H;
 function resize(){
   DPR = window.devicePixelRatio || 1;
@@ -47,11 +51,14 @@ const nextBtn = document.getElementById('nextBtn');
 let audioCtx = null;
 let analyser = null;
 let dataArray = null;
+let mediaSourceNode = null;
 let audioUnlocked = false;
 let audioLevel = 0;
-let mediaSourceNode = null; // NEW: keep a reference
 
 function initAudioGraph(){
+  // iOS: use plain <audio>, no Web Audio graph
+  if (isIOS) return;
+
   const AC = window.AudioContext || window.webkitAudioContext;
   if (!AC) return;
 
@@ -59,13 +66,9 @@ function initAudioGraph(){
     audioCtx = new AC();
   }
 
-  if (audioCtx.state === 'suspended'){
-    audioCtx.resume();
-  }
-
   if (!analyser){
     analyser = audioCtx.createAnalyser();
-    analyser.fftSize = 2048;
+    analyser.fftSize = 1024; // or 2048 if you prefer
     dataArray = new Uint8Array(analyser.fftSize);
   }
 
@@ -73,6 +76,10 @@ function initAudioGraph(){
     mediaSourceNode = audioCtx.createMediaElementSource(player);
     mediaSourceNode.connect(analyser);
     analyser.connect(audioCtx.destination);
+  }
+
+  if (audioCtx.state === 'suspended'){
+    audioCtx.resume();
   }
 }
 
@@ -139,8 +146,23 @@ folderBtn.onclick = () => {
 };
 
 folderInput.onchange = e => {
-  const files = [...e.target.files].filter(f => /\.(mp3|wav|ogg|m4a|flac)$/i.test(f.name));
-  if (!files.length) return;
+  let files = [...e.target.files];
+
+  if (isIOS){
+    // iOS-safe formats
+    files = files.filter(f => /\.(mp3|m4a|aac|wav)$/i.test(f.name));
+  } else {
+    // Everyone else can have the full set
+    files = files.filter(f => /\.(mp3|wav|ogg|m4a|flac)$/i.test(f.name));
+  }
+
+  if (!files.length){
+    trackDisplay.textContent = isIOS
+      ? "On iOS, use MP3 / M4A / AAC / WAV."
+      : "No supported audio files found.";
+    return;
+  }
+
   generateWorld(files);
 };
 
@@ -259,13 +281,28 @@ if (prevBtn){
       trackDisplay.textContent = "Choose music first";
       return;
     }
-    exitRelaxModeIfNeeded();
+
+    // In Relax/Shuffle mode: prev = random track, but keep Relax on
+    if (relaxMode || shuffleMode){
+      if (!audioUnlocked){
+        initAudioGraph();
+        player.play().then(() => {
+          audioUnlocked = true;
+          if (audioBtn) audioBtn.style.display = 'none';
+          playRandomIsland();
+        }).catch(console.error);
+      } else {
+        playRandomIsland();
+      }
+      return;
+    }
+
+    // Normal mode: go to previous by index
     let idx = getCurrentIndex();
     if (idx === -1) idx = 0;
     else idx = idx - 1;
     playByIndex(idx);
 
-    // ensure audio is unlocked / playing
     if (!audioUnlocked){
       initAudioGraph();
       player.play().then(() => {
@@ -282,7 +319,23 @@ if (nextBtn){
       trackDisplay.textContent = "Choose music first";
       return;
     }
-    exitRelaxModeIfNeeded();
+
+    // In Relax/Shuffle mode: next = random track, but keep Relax on
+    if (relaxMode || shuffleMode){
+      if (!audioUnlocked){
+        initAudioGraph();
+        player.play().then(() => {
+          audioUnlocked = true;
+          if (audioBtn) audioBtn.style.display = 'none';
+          playRandomIsland();
+        }).catch(console.error);
+      } else {
+        playRandomIsland();
+      }
+      return;
+    }
+
+    // Normal mode: go to next by index
     let idx = getCurrentIndex();
     if (idx === -1) idx = 0;
     else idx = idx + 1;
@@ -311,7 +364,6 @@ if (playPauseBtn){
         trackDisplay.textContent = current.name;
         player.src = URL.createObjectURL(current.file);
       }
-      exitRelaxModeIfNeeded();
       (async () => {
         try {
           await player.play();
@@ -328,7 +380,6 @@ if (playPauseBtn){
     }
 
     // toggle play / pause
-    exitRelaxModeIfNeeded();
     if (player.paused){
       player.play().then(() => {
         playPauseBtn.textContent = "Pause";
@@ -470,7 +521,7 @@ function update(dt){
     ship.y += ship.vy * dt * 60;
   }
 
-  ship.trail.push({x: ship.x, y: ship.y, t: time});
+  ship.trail.push({ x: ship.x, y: ship.y, t: time });
   if (ship.trail.length > 60){
     ship.trail.shift();
   }
@@ -493,13 +544,22 @@ function update(dt){
     let sum = 0;
     for (let i = 0; i < dataArray.length; i++){
       const v = (dataArray[i] - 128) / 128;
-      sum += v*v;
+      sum += v * v;
     }
     const rms = Math.sqrt(sum / dataArray.length);
     const level = Math.min(1, rms * 4);
     audioLevel = audioLevel * 0.8 + level * 0.2;
   } else {
-    audioLevel = audioLevel * 0.9;
+    if (isIOS && !player.paused){
+      // iOS: fake a gentle musical pulse so visuals stay alive
+      const fake =
+        0.3 +
+        0.2 * Math.sin(time * 2.0) +
+        0.1 * Math.sin(time * 3.7);
+      audioLevel = audioLevel * 0.8 + fake * 0.2;
+    } else {
+      audioLevel = audioLevel * 0.9;
+    }
   }
 
   if (!relaxMode){
